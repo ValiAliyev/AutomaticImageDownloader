@@ -1,0 +1,50 @@
+import os
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+def get_all_images(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    img_tags = soup.find_all('img')
+    img_urls = [img['src'] for img in img_tags if 'src' in img.attrs]
+
+    # Resolve relative URLs
+    img_urls = [urljoin(url, img_url) for img_url in img_urls]
+    # Remove duplicates
+    img_urls = list(set(img_urls))
+
+    return img_urls
+
+def download_image(url, folder, counter):
+    # Create the folder if it doesn't exist
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        # Parse the URL to get the image filename
+        parsed_url = urlparse(url)
+        image_name = os.path.basename(parsed_url.path)
+        image_name, image_extension = os.path.splitext(image_name)
+
+        # Create a unique filename by appending the counter
+        unique_image_name = f"{image_name}_{counter}{image_extension}"
+        image_path = os.path.join(folder, unique_image_name)
+
+        with open(image_path, 'wb') as file:
+            for chunk in response.iter_content(1024):
+                file.write(chunk)
+        print(f"Downloaded: {unique_image_name}")
+    else:
+        print(f"Failed to retrieve {url}")
+
+def download_images_from_url(url, folder='images'):
+    img_urls = get_all_images(url)
+    for counter, img_url in enumerate(img_urls, start=1):
+        download_image(img_url, folder, counter)
+
+if __name__ == "__main__":
+    website_url = input("Enter the URL of the website: ")
+    download_folder = input("Enter the folder path where you want to save images: ")
+    download_images_from_url(website_url, download_folder)
